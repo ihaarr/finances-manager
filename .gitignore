@@ -1,3 +1,4 @@
+target/
 src-tauri/finances.db
 # Logs
 logs

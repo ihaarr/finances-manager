@@ -25,6 +25,12 @@ impl AppState {
                 name TEXT NOT NULL,
                 UNIQUE(category_id, name)
             );
+            CREATE TABLE IF NOT EXISTS operation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subcategory_id INTEGER NOT NULL REFERENCES subcategory(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                value INTEGER NOT NULL
+            );
             "#).expect("Failed to create tables");
         AppState { conn: Mutex::new(conn) }
     }
@@ -41,6 +47,14 @@ pub struct Subcategory {
     pub id: usize,
     pub category_id: usize,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Operation {
+    pub id: usize,
+    pub subcategory_id: usize,
+    pub date: String,
+    pub value: u64,
 }
 
 #[tauri::command]
@@ -88,6 +102,32 @@ fn create_subcategory(state: State<AppState>, category_id: usize, name: String) 
         },
         Err(e) => {
             println!("Failed to create subcategory '{}': {}", name, e);
+            Err(format!("DB Error: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn create_operation(state: State<AppState>, subcategory_id: usize, date: String, value: u64) -> Result<Value, String> {
+    println!("create_operation called: subcategory_id={}, date={}, value={}", subcategory_id, date, value);
+    let conn = state.conn.lock().unwrap();
+    let mut stmt = match conn.prepare(
+        "INSERT INTO operation (subcategory_id, date, value) VALUES (?1, ?2, ?3) RETURNING id"
+    ) {
+        Ok(stmt) => stmt,
+        Err(e) => {
+            println!("Failed to prepare create_operation stmt: {}", e);
+            return Err(format!("DB Error: {}", e));
+        }
+    };
+    let id_result: Result<i64, _> = stmt.query_row(params![subcategory_id as i64, date, value as i64], |row| row.get(0));
+    match id_result {
+        Ok(id) => {
+            println!("Operation created successfully, id={}", id);
+            Ok(json!({ "id": id }))
+        },
+        Err(e) => {
+            println!("Failed to create operation: {}", e);
             Err(format!("DB Error: {}", e))
         }
     }
@@ -170,6 +210,29 @@ fn update_subcategory(state: State<AppState>, id: usize, name: String) -> Result
     Ok(())
 }
 
+#[tauri::command]
+fn list_operations(state: State<AppState>) -> Result<Value, String> {
+    println!("list_operations called");
+    let conn = state.conn.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, subcategory_id, date, value FROM operation ORDER BY date DESC, id DESC")
+        .map_err(|e| e.to_string())?;
+    
+    let ops_iter = stmt.query_map([], |row| {
+        Ok(Operation {
+            id: row.get(0)?,
+            subcategory_id: row.get(1)?,
+            date: row.get(2)?,
+            value: row.get(3)?,
+        })
+    }).map_err(|e| e.to_string())?;
+    
+    let mut ops = vec![];
+    for op in ops_iter {
+        ops.push(op.map_err(|e| e.to_string())?);
+    }
+    Ok(serde_json::to_value(&ops).unwrap())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = AppState::new();
@@ -178,7 +241,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(
             tauri::generate_handler![
-                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory
+                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory, create_operation, list_operations
             ]
         )
         .run(tauri::generate_context!())
