@@ -18,7 +18,7 @@ interface Subcategory {
   name: string;
 }
 
-type DateFilter = 'day' | 'week' | 'month' | 'custom';
+type DateFilter = 'day' | 'week' | 'month' | 'year' | 'custom';
 
 const Operations: FunctionalComponent = () => {
   const [allOperations, setAllOperations] = useState<Operation[]>([]);
@@ -98,6 +98,13 @@ const Operations: FunctionalComponent = () => {
         // Current month: from first day to last day of current month
         const fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
         const toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of month
+        
+        fromStr = formatDateLocal(fromDate);
+        toStr = formatDateLocal(toDate);
+      } else if (dateFilter === 'year') {
+        // Current year: from January 1st to December 31st of current year
+        const fromDate = new Date(now.getFullYear(), 0, 1); // January 1st
+        const toDate = new Date(now.getFullYear(), 11, 31); // December 31st
         
         fromStr = formatDateLocal(fromDate);
         toStr = formatDateLocal(toDate);
@@ -245,6 +252,14 @@ const Operations: FunctionalComponent = () => {
                 onClick={() => setDateFilter('month')}
               >
                 Месяц
+              </button>
+              <button
+                type="button"
+                class={`btn ${dateFilter === 'year' ? 'btn-primary' : 'btn-secondary'}`}
+                style={dateFilter === 'year' ? {background: '#3e62ad'} : {background: '#373a42', color: '#e6e8eb'}}
+                onClick={() => setDateFilter('year')}
+              >
+                Год
               </button>
               <button
                 type="button"
