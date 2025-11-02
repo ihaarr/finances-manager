@@ -43,13 +43,6 @@ pub struct Subcategory {
     pub name: String,
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    println!("greet called with name: {}", name);
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[tauri::command]
 fn create_category(state: State<AppState>, name: String) -> Result<Value, String> {
     println!("create_category called with name: {}", name);
@@ -90,7 +83,7 @@ fn create_subcategory(state: State<AppState>, category_id: usize, name: String) 
     let id_result: Result<i64, _> = stmt.query_row(params![category_id as i64, name], |row| row.get(0));
     match id_result {
         Ok(id) => {
-            println!("Subcategory '{}' (cat_id={}) created successfully, id={}", name, category_id, id);
+            println!("Subcategory '{}' (category_id={}) created successfully, id={}", name, category_id, id);
             Ok(json!({ "id": id }))
         },
         Err(e) => {
@@ -141,6 +134,42 @@ fn list_subcategories(state: State<AppState>) -> Result<Value, String> {
     Ok(serde_json::to_value(&subs).unwrap())
 }
 
+#[tauri::command]
+fn remove_category(state: State<AppState>, id: usize) -> Result<(), String> {
+    println!("remove_category called with id: {}", id);
+    let conn = state.conn.lock().unwrap();
+    conn.execute("DELETE FROM category WHERE id=?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn remove_subcategory(state: State<AppState>, id: usize) -> Result<(), String> {
+    println!("remove_subcategory called with id: {}", id);
+    let conn = state.conn.lock().unwrap();
+    conn.execute("DELETE FROM subcategory WHERE id=?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn update_category(state: State<AppState>, id: usize, name: String) -> Result<(), String> {
+    println!("update_category called: id={} name={}", id, name);
+    let conn = state.conn.lock().unwrap();
+    conn.execute("UPDATE category SET name=?1 WHERE id=?2", params![name, id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn update_subcategory(state: State<AppState>, id: usize, name: String) -> Result<(), String> {
+    println!("update_subcategory called: id={} name={}", id, name);
+    let conn = state.conn.lock().unwrap();
+    conn.execute("UPDATE subcategory SET name=?1 WHERE id=?2", params![name, id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = AppState::new();
@@ -149,7 +178,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(
             tauri::generate_handler![
-                greet, create_category, create_subcategory, list_categories, list_subcategories
+                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory
             ]
         )
         .run(tauri::generate_context!())

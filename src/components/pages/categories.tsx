@@ -1,5 +1,5 @@
 import { FunctionalComponent } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useState, useRef } from 'preact/hooks';
 import { invoke } from '@tauri-apps/api/core';
 
 interface Category {
@@ -11,6 +11,11 @@ interface Subcategory {
   category_id: number;
   name: string;
 }
+
+type ContextMenu =
+  | { type: 'category', id: number, anchor: HTMLElement | null }
+  | { type: 'subcategory', id: number, anchor: HTMLElement | null }
+  | null;
 
 const folderIcon = <span class="me-2" role="img" aria-label="folder">
   <svg width="20" height="20" viewBox="0 0 20 20"><rect x="1" y="5" width="18" height="13" rx="2" fill="#23272e"/><rect x="1" y="3" width="6" height="4" rx="1.5" fill="#3b4252"/></svg>
@@ -26,52 +31,85 @@ const Categories: FunctionalComponent = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [subcategoryCategoryId, setSubcategoryCategoryId] = useState<number | null>(null);
+  // Edit modal state
+  const [editContext, setEditContext] = useState<{ type: 'category'|'subcategory', id: number, name: string }|null>(null);
+  const [editName, setEditName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   // Input state
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  // For focus management
+  const menuRef = useRef<HTMLDivElement>(null);
 
   function refresh() {
     invoke<Category[]>("list_categories").then(setCategories);
     invoke<Subcategory[]>("list_subcategories").then(setSubcategories);
   }
+  useEffect(() => { refresh(); }, []);
+  function subsForCat(catId: number) { return subcategories.filter(s => s.category_id === catId); }
+  function onAddCategory() { setNewCategoryName(""); setError(""); setShowCategoryModal(true); }
+  function onAddSubcategory(categoryId: number) { setSubcategoryCategoryId(categoryId); setNewSubcategoryName(""); setError(""); setShowSubcategoryModal(true); }
+  // Context menu handlers
+  function openContextMenu(type: 'category'|'subcategory', id: number, e: Event) {
+    e.preventDefault();
+    setContextMenu({type, id, anchor: e.currentTarget as HTMLElement});
+  }
+  function closeContextMenu() { setContextMenu(null); }
+  // Click-away and escape closes context menu
   useEffect(() => {
-    refresh();
-  }, []);
-  function subsForCat(catId: number) {
-    return subcategories.filter(s => s.category_id === catId);
-  }
-  function onAddCategory() {
-    setNewCategoryName(""); setError(""); setShowCategoryModal(true);
-  }
-  function onAddSubcategory(categoryId: number) {
-    setSubcategoryCategoryId(categoryId); setNewSubcategoryName(""); setError(""); setShowSubcategoryModal(true);
-  }
+    if (!contextMenu) return;
+    const handler = (e: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(e.target as any)) closeContextMenu();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [contextMenu]);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeContextMenu(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [contextMenu]);
 
-  // Create handlers (backend)
+  // --- Backend CRUD ---
   async function saveCategory() {
     if (!newCategoryName.trim()) return setError("Введите название категории");
     setSaving(true); setError("");
-    try {
-      await invoke("create_category", { name: newCategoryName.trim() });
+    try { await invoke("create_category", { name: newCategoryName.trim() });
       setShowCategoryModal(false); refresh();
-    } catch (e: any) {
-      setError(e.toString());
-    } finally { setSaving(false); }
+    } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
   async function saveSubcategory() {
     if (!newSubcategoryName.trim()) return setError("Введите название подкатегории");
     setSaving(true); setError("");
-    try {
-      await invoke("create_subcategory", { categoryId: subcategoryCategoryId, name: newSubcategoryName.trim() });
+    try { await invoke("create_subcategory", { categoryId: subcategoryCategoryId, name: newSubcategoryName.trim() });
       setShowSubcategoryModal(false); refresh();
-    } catch (e: any) {
-      setError(e.toString());
-    } finally { setSaving(false); }
+    } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
+  }
+  async function removeCategory(id: number) {
+    await invoke('remove_category', { id }); refresh();
+  }
+  async function removeSubcategory(id: number) {
+    await invoke('remove_subcategory', { id }); refresh();
+  }
+  // -- Edit Modal --
+  function startEdit(type: 'category'|'subcategory', id: number, name: string) {
+    setEditName(name); setEditContext({ type, id, name }); closeContextMenu(); setError("");
+  }
+  async function saveEdit() {
+    if (!editName.trim()) return setError('Введите новое имя');
+    setSaving(true); setError("");
+    try {
+      if (editContext?.type === 'category') await invoke('update_category', { id: editContext.id, name: editName.trim() });
+      else if (editContext?.type === 'subcategory') await invoke('update_subcategory', { id: editContext.id, name: editName.trim() });
+      setEditContext(null); refresh();
+    } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
 
-  // Modal dialogs
+  // --- Modals ---
   const modalBackdrop = <div style={{position:'fixed',zIndex:1040,inset:0,background:'#18191aee',backdropFilter:'blur(2px)', pointerEvents:'auto'}}/>;
   function CategoryModal() {
     return (
@@ -123,6 +161,58 @@ const Categories: FunctionalComponent = () => {
       </div>
     );
   }
+  function EditModal() {
+    if (!editContext) return null;
+    const title = editContext.type === 'category' ? 'Редактировать категорию' : 'Редактировать подкатегорию';
+    return (
+      <div style={{position:'fixed',zIndex:1050,top:0,left:0,width:'100vw',height:'100vh', display:'flex',justifyContent:'center',alignItems:'center'}}>
+        <div class="bg-dark rounded px-4 py-3 shadow-lg" style={{minWidth:360, maxWidth:440}}>
+          <h5 class="mb-3" style={{color:'#e6e8eb'}}>{title}</h5>
+          <input
+            class="form-control mb-2"
+            type="text"
+            value={editName}
+            style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
+            disabled={saving}
+            onInput={e => setEditName((e.target as HTMLInputElement).value)}
+            onKeyDown={e => (e.key === 'Enter' ? saveEdit() : undefined)}
+            autoFocus
+            placeholder="Новое имя"
+          />
+          {error && <div class="text-danger small mb-2">{error}</div>}
+          <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-secondary" style={{background:'#373a42'}} onClick={() => setEditContext(null)} disabled={saving}>Отмена</button>
+            <button class="btn btn-primary" style={{background:'#3e62ad'}} onClick={saveEdit} disabled={saving}>Сохранить</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // --- ContextMenu UI ---
+  function ContextMenuPopup() {
+    if (!contextMenu) return null;
+    // Find coordinates
+    const anchor = contextMenu.anchor;
+    let style: any = { position: 'fixed', zIndex: 2001, minWidth: 120, background: '#18191a', border: '1px solid #333', color: '#e6e8eb', borderRadius: 8, boxShadow: '0 2px 7px #000a', padding: '4px 0' };
+    if (anchor) {
+      const rect = anchor.getBoundingClientRect();
+      style.left = rect.right - 30; // to right of three-dots
+      style.top = rect.bottom + 3;
+    }
+    return (
+      <div ref={menuRef} style={style}>
+        <button class="dropdown-item" style={{background:'transparent',color:'#e6e8eb',border:'none',width:'100%',textAlign:'left'}} onClick={() => {
+          if(contextMenu.type==='category') startEdit('category', contextMenu.id, categories.find(c=>c.id===contextMenu.id)?.name||'')
+          else startEdit('subcategory', contextMenu.id, subcategories.find(s=>s.id===contextMenu.id)?.name||'')
+        }}>Редактировать</button>
+        <button class="dropdown-item" style={{background:'transparent',color:'#e25e5e',border:'none',width:'100%',textAlign:'left'}} onClick={() => {
+          if(contextMenu.type==='category') removeCategory(contextMenu.id);
+          else removeSubcategory(contextMenu.id);
+          closeContextMenu();
+        }}>Удалить</button>
+      </div>
+    )
+  }
 
   return (
     <div class="container py-4" style={{color: '#e6e8eb'}}>
@@ -140,7 +230,7 @@ const Categories: FunctionalComponent = () => {
                 <button class="btn btn-link px-2 py-0" style={{color:'#7ba1ff'}} onClick={() => onAddSubcategory(cat.id)} title="Добавить подкатегорию">
                   <span style={{fontSize: '20px', lineHeight: 1}}>+</span>
                 </button>
-                <button class="btn btn-link px-2 py-0" style={{color:'#999'}} title="Действия"><b>...</b></button>
+                <button class="btn btn-link px-2 py-0" style={{color:'#999', position:'relative'}} title="Действия" onClick={e => openContextMenu('category', cat.id, e)}><b>...</b></button>
               </div>
             </div>
             {subsForCat(cat.id).length > 0 && (
@@ -150,7 +240,7 @@ const Categories: FunctionalComponent = () => {
                     {fileIcon}
                     <span>{sub.name}</span>
                     <div class="ms-auto">
-                      <button class="btn btn-link px-2 py-0" style={{color:'#999'}} title="Действия"><b>...</b></button>
+                      <button class="btn btn-link px-2 py-0" style={{color:'#999', position:'relative'}} title="Действия" onClick={e => openContextMenu('subcategory', sub.id, e)}><b>...</b></button>
                     </div>
                   </div>
                 ))}
@@ -159,10 +249,11 @@ const Categories: FunctionalComponent = () => {
           </div>
         ))}
       </div>
-      {/* Modals are rendered outside normal tab order to block background */}
-      {(showCategoryModal || showSubcategoryModal) && modalBackdrop}
+      {(showCategoryModal || showSubcategoryModal || editContext) && modalBackdrop}
       {showCategoryModal && CategoryModal()}
       {showSubcategoryModal && SubcategoryModal()}
+      {editContext && EditModal()}
+      {ContextMenuPopup()}
     </div>
   );
 };
