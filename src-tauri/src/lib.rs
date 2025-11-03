@@ -11,7 +11,9 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
-        let conn = Connection::open("finances.db").expect("Failed to open finances.db");
+        let home = std::env::home_dir().unwrap_or_default();
+        let path = format!("{}/finances.db", home.display());
+        let conn = Connection::open(path).expect("Failed to open finances.db");
         conn.execute_batch("PRAGMA foreign_keys=ON;").expect("Failed to enable foreign keys");
         conn.execute_batch(
             r#"

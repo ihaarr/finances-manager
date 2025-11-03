@@ -27,6 +27,7 @@ const fileIcon = <span class="me-2" role="img" aria-label="file">
 const Categories: FunctionalComponent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   // Dialog state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
@@ -52,6 +53,19 @@ const Categories: FunctionalComponent = () => {
   function subsForCat(catId: number) { return subcategories.filter(s => s.category_id === catId); }
   function onAddCategory() { setNewCategoryName(""); setError(""); setShowCategoryModal(true); }
   function onAddSubcategory(categoryId: number) { setSubcategoryCategoryId(categoryId); setNewSubcategoryName(""); setError(""); setShowSubcategoryModal(true); }
+  
+  function toggleCategory(catId: number) {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(catId)) {
+        newSet.delete(catId);
+      } else {
+        newSet.add(catId);
+      }
+      return newSet;
+    });
+  }
+  
   // Context menu handlers
   function openContextMenu(type: 'category'|'subcategory', id: number, e: Event) {
     e.preventDefault();
@@ -221,33 +235,49 @@ const Categories: FunctionalComponent = () => {
         <button class="btn btn-primary" style={{background: '#3e62ad', borderColor: '#345091'}} onClick={onAddCategory}>+ Добавить категорию</button>
       </div>
       <div>
-        {categories.map(cat => (
-          <div key={cat.id} style={{background: '#23242c', borderRadius: '8px', marginBottom: 12, boxShadow: '0 1px 4px #15151b80'}}>
-            <div class="d-flex align-items-center px-3 py-2" style={{color: '#e6e8eb'}}>
-              {folderIcon}
-              <span class="fw-semibold" style={{color: '#e6e8eb'}}>{cat.name}</span>
-              <div class="ms-auto d-flex align-items-center">
-                <button class="btn btn-link px-2 py-0" style={{color:'#7ba1ff'}} onClick={() => onAddSubcategory(cat.id)} title="Добавить подкатегорию">
-                  <span style={{fontSize: '20px', lineHeight: 1}}>+</span>
-                </button>
-                <button class="btn btn-link px-2 py-0" style={{color:'#999', position:'relative'}} title="Действия" onClick={e => openContextMenu('category', cat.id, e)}><b>...</b></button>
+        {categories.map(cat => {
+          const isExpanded = expandedCategories.has(cat.id);
+          const hasSubcategories = subsForCat(cat.id).length > 0;
+          return (
+            <div key={cat.id} style={{background: '#23242c', borderRadius: '8px', marginBottom: 12, boxShadow: '0 1px 4px #15151b80'}}>
+              <div class="d-flex align-items-center px-3 py-2" style={{color: '#e6e8eb'}}>
+                {hasSubcategories && (
+                  <button
+                    class="btn btn-link px-2 py-0 me-1"
+                    style={{color:'#999', padding: '0 4px'}}
+                    onClick={() => toggleCategory(cat.id)}
+                    title={isExpanded ? "Свернуть" : "Развернуть"}
+                  >
+                    <span style={{fontSize: '16px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                      {isExpanded ? '▼' : '►'}
+                    </span>
+                  </button>
+                )}
+                {folderIcon}
+                <span class="fw-semibold" style={{color: '#e6e8eb'}}>{cat.name}</span>
+                <div class="ms-auto d-flex align-items-center">
+                  <button class="btn btn-link px-2 py-0" style={{color:'#7ba1ff'}} onClick={() => onAddSubcategory(cat.id)} title="Добавить подкатегорию">
+                    <span style={{fontSize: '20px', lineHeight: 1}}>+</span>
+                  </button>
+                  <button class="btn btn-link px-2 py-0" style={{color:'#999', position:'relative'}} title="Действия" onClick={e => openContextMenu('category', cat.id, e)}><b>...</b></button>
+                </div>
               </div>
-            </div>
-            {subsForCat(cat.id).length > 0 && (
-              <div class="ps-4">
-                {subsForCat(cat.id).map(sub => (
-                  <div key={sub.id} class="d-flex align-items-center px-3 py-2 border-0 bg-transparent" style={{color: '#c8cad5'}}>
-                    {fileIcon}
-                    <span>{sub.name}</span>
-                    <div class="ms-auto">
-                      <button class="btn btn-link px-2 py-0" style={{color:'#999', position:'relative'}} title="Действия" onClick={e => openContextMenu('subcategory', sub.id, e)}><b>...</b></button>
+              {isExpanded && hasSubcategories && (
+                <div class="ps-4">
+                  {subsForCat(cat.id).map(sub => (
+                    <div key={sub.id} class="d-flex align-items-center px-3 py-2 border-0 bg-transparent" style={{color: '#c8cad5'}}>
+                      {fileIcon}
+                      <span>{sub.name}</span>
+                      <div class="ms-auto">
+                        <button class="btn btn-link px-2 py-0" style={{color:'#999', position:'relative'}} title="Действия" onClick={e => openContextMenu('subcategory', sub.id, e)}><b>...</b></button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       {(showCategoryModal || showSubcategoryModal || editContext) && modalBackdrop}
       {showCategoryModal && CategoryModal()}
