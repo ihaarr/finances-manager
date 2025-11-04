@@ -36,6 +36,13 @@ const Operations: FunctionalComponent = () => {
   const [error, setError] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [expandedSubcategories, setExpandedSubcategories] = useState<Set<number>>(new Set());
+  
+  // Update modal state
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateOperationId, setUpdateOperationId] = useState<number | null>(null);
+  const [updateOperationSubcategory, setUpdateOperationSubcategory] = useState<number | null>(null);
+  const [updateOperationDate, setUpdateOperationDate] = useState('');
+  const [updateOperationValue, setUpdateOperationValue] = useState('');
 
 
   // Helper function to format date as YYYY-MM-DD in local time
@@ -100,16 +107,11 @@ const Operations: FunctionalComponent = () => {
       }
     }
 
-    // Filter by subcategory
-    if (selectedSubcategory) {
-      filtered = filtered.filter(op => op.subcategory_id === selectedSubcategory);
-    }
-
     return filtered;
-  }, [allOperations, dateFilter, customFrom, customTo, selectedSubcategory]);
+  }, [allOperations, dateFilter, customFrom, customTo]);
 
   function formatValue(value: number): string {
-    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(value / 100);
+    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(value);
   }
 
   function toggleCategory(categoryId: number) {
@@ -177,37 +179,77 @@ const Operations: FunctionalComponent = () => {
       console.error('Error removing operation:', e);
     }
   }
-
-  async function saveOperation() {
-    if (!newOperationSubcategory) return setError('Выберите подкатегорию');
-    if (!newOperationDate) return setError('Укажите дату');
-    if (!newOperationValue || Number(newOperationValue) <= 0) return setError('Укажите сумму');
-    
-    setSaving(true);
-    setError('');
-    try {
-      // Convert value from rubles to kopecks (assuming input is in rubles)
-      const valueInKopecks = Math.round(Number(newOperationValue) * 100);
-      const result = await invoke<Operation>('create_operation', {
-        subcategoryId: newOperationSubcategory,
-        date: newOperationDate,
-        value: valueInKopecks,
-      });
-      setShowModal(false);
-      // Use only the ID from response, and the data from UI input
-      const newOperation: Operation = {
-        id: result.id,
-        subcategory_id: newOperationSubcategory,
-        date: newOperationDate,
-        value: valueInKopecks
-      };
-      addOperation(newOperation);
-    } catch (e: any) {
-      setError(e.toString());
-    } finally {
-      setSaving(false);
-    }
+async function saveOperation() {
+  if (!newOperationSubcategory) return setError('Выберите подкатегорию');
+  if (!newOperationDate) return setError('Укажите дату');
+  if (!newOperationValue || Number(newOperationValue) <= 0) return setError('Укажите сумму');
+  
+  setSaving(true);
+  setError('');
+  try {
+    const result = await invoke<Operation>('create_operation', {
+      subcategoryId: newOperationSubcategory,
+      date: newOperationDate,
+      value: Number(newOperationValue),
+    });
+    setShowModal(false);
+    // Use only the ID from response, and the data from UI input
+    const newOperation: Operation = {
+      id: result.id,
+      subcategory_id: newOperationSubcategory,
+      date: newOperationDate,
+      value: Number(newOperationValue)
+    };
+    addOperation(newOperation);
+  } catch (e: any) {
+    setError(e.toString());
+  } finally {
+    setSaving(false);
   }
+}
+
+async function updateOperationById(id: number, subcategoryId: number, date: string, value: number) {
+  try {
+    await invoke('update_operation', { id, subcategoryId, date, value });
+    updateOperation({ id, subcategory_id: subcategoryId, date, value });
+    setShowUpdateModal(false);
+  } catch (e: any) {
+    console.error('Error updating operation:', e);
+    setError(e.toString());
+  }
+}
+
+async function handleUpdateOperation() {
+  if (!updateOperationId) return;
+  if (!updateOperationSubcategory) return setError('Выберите подкатегорию');
+  if (!updateOperationDate) return setError('Укажите дату');
+  if (!updateOperationValue || Number(updateOperationValue) <= 0) return setError('Укажите сумму');
+  
+  setSaving(true);
+  setError('');
+  
+  try {
+    await updateOperationById(updateOperationId, updateOperationSubcategory, updateOperationDate, Number(updateOperationValue));
+    setShowUpdateModal(false);
+  } catch (e: any) {
+    setError(e.toString());
+  } finally {
+    setSaving(false);
+  }
+}
+
+function openUpdateModal(op: Operation) {
+  const subcategory = subcategories.find(s => s.id === op.subcategory_id);
+  if (!subcategory) return;
+  
+  setUpdateOperationId(op.id);
+  setUpdateOperationSubcategory(op.subcategory_id);
+  setUpdateOperationDate(op.date);
+  setUpdateOperationValue(op.value.toString());
+  setError('');
+  setShowUpdateModal(true);
+}
+
 
   return (
     <div class="container py-4" style={{color: '#e6e8eb'}}>
@@ -287,27 +329,6 @@ const Operations: FunctionalComponent = () => {
               </div>
             )}
           </div>
-
-          {/* Subcategory Filter */}
-          <div class="col-12 col-md-6">
-            <label class="form-label" style={{color: '#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
-            <select
-              class="form-select"
-              style={{background: '#18191A', color: '#e6e8eb', border: '1px solid #444'}}
-              value={selectedSubcategory || ''}
-              onChange={(e: Event) => setSelectedSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
-            >
-              <option value="">Все</option>
-              {subcategories.map(sub => {
-                const cat = categories.find(c => c.id === sub.category_id);
-                return (
-                  <option key={sub.id} value={sub.id}>
-                    {cat ? `${cat.name} / ${sub.name}` : sub.name}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
         </div>
       </div>
 
@@ -379,6 +400,16 @@ const Operations: FunctionalComponent = () => {
                                   </div>
                                   <button
                                     class="btn btn-sm"
+                                    style={{color: '#3e62ad', padding: '0.25rem 0.5rem', marginRight: '0.5rem'}}
+                                    onClick={() => openUpdateModal(op)}
+                                    title="Редактировать операцию"
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                      <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V12.5h2.793L10.5 8.793l2.293 2.293z"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    class="btn btn-sm"
                                     style={{color: '#e25e5e', padding: '0.25rem 0.5rem'}}
                                     onClick={() => removeOperationById(op.id)}
                                     title="Удалить операцию"
@@ -413,27 +444,8 @@ const Operations: FunctionalComponent = () => {
           <div style={{position:'fixed',zIndex:1050,top:0,left:0,width:'100vw',height:'100vh', display:'flex',justifyContent:'center',alignItems:'center'}}>
             <div class="bg-dark rounded px-4 py-3 shadow-lg" style={{minWidth:400, maxWidth:500}}>
               <h5 class="mb-3" style={{color:'#e6e8eb'}}>Новая операция</h5>
-              
-              <div class="mb-3">
-                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
-                <select
-                  class="form-select"
-                  style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
-                  value={newOperationSubcategory || ''}
-                  disabled={saving}
-                  onChange={(e: Event) => setNewOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
-                >
-                  <option value="">Выберите подкатегорию</option>
-                  {subcategories.map(sub => {
-                    const cat = categories.find(c => c.id === sub.category_id);
-                    return (
-                      <option key={sub.id} value={sub.id}>
-                        {cat ? `${cat.name} / ${sub.name}` : sub.name}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              {/* Removed subcategory selection from modal */}
+
 
               <div class="mb-3">
                 <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Дата</label>
@@ -472,6 +484,79 @@ const Operations: FunctionalComponent = () => {
                 </button>
                 <button class="btn btn-primary" style={{background:'#3e62ad'}} onClick={saveOperation} disabled={saving}>
                   Создать
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      
+      {/* Update Modal */}
+      {showUpdateModal && updateOperationId && (
+        <>
+          <div style={{position:'fixed',zIndex:1040,inset:0,background:'#18191aee',backdropFilter:'blur(2px)', pointerEvents:'auto'}}/>
+          <div style={{position:'fixed',zIndex:1050,top:0,left:0,width:'100vw',height:'100vh', display:'flex',justifyContent:'center',alignItems:'center'}}>
+            <div class="bg-dark rounded px-4 py-3 shadow-lg" style={{minWidth:400, maxWidth:500}}>
+              <h5 class="mb-3" style={{color:'#e6e8eb'}}>Редактировать операцию</h5>
+              
+              <div class="mb-3">
+                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
+                <select
+                  class="form-select"
+                  style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
+                  value={updateOperationSubcategory || ''}
+                  disabled={saving}
+                  onChange={(e: Event) => setUpdateOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
+                >
+                  <option value="">Выберите подкатегорию</option>
+                  {subcategories.map(sub => {
+                    const cat = categories.find(c => c.id === sub.category_id);
+                    return (
+                      <option key={sub.id} value={sub.id}>
+                        {cat ? `${cat.name} / ${sub.name}` : sub.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Дата</label>
+                <input
+                  class="form-control"
+                  type="date"
+                  value={updateOperationDate}
+                  style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
+                  disabled={saving}
+                  onInput={(e) => setUpdateOperationDate((e.target as HTMLInputElement).value)}
+                />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Сумма (руб.)</label>
+                <input
+                  class="form-control"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={updateOperationValue}
+                  style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #44'}}
+                  disabled={saving}
+                  onInput={(e) => setUpdateOperationValue((e.target as HTMLInputElement).value)}
+                  onKeyDown={(e) => (e.key === 'Enter' ? handleUpdateOperation() : undefined)}
+                  autoFocus
+                  placeholder="0.00"
+                />
+              </div>
+
+              {error && <div class="text-danger small mb-2">{error}</div>}
+
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" style={{background:'#373a42'}} onClick={() => setShowUpdateModal(false)} disabled={saving}>
+                  Отмена
+                </button>
+                <button class="btn btn-primary" style={{background:'#3e62ad'}} onClick={handleUpdateOperation} disabled={saving}>
+                  Сохранить
                 </button>
               </div>
             </div>

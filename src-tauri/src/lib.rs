@@ -222,6 +222,18 @@ fn remove_operation(state: State<AppState>, id: usize) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn update_operation(state: State<AppState>, id: usize, subcategory_id: usize, date: String, value: u64) -> Result<(), String> {
+    println!("update_operation called: id={}, subcategory_id={}, date={}, value={}", id, subcategory_id, date, value);
+    let conn = state.conn.lock().unwrap();
+    conn.execute(
+        "UPDATE operation SET subcategory_id=?1, date=?2, value=?3 WHERE id=?4",
+        params![subcategory_id as i64, date, value as i64, id as i64]
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn list_operations(state: State<AppState>) -> Result<Value, String> {
     println!("list_operations called");
     let conn = state.conn.lock().unwrap();
@@ -252,7 +264,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(
             tauri::generate_handler![
-                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory, create_operation, list_operations, remove_operation
+                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory, create_operation, list_operations, remove_operation, update_operation
             ]
         )
         .run(tauri::generate_context!())

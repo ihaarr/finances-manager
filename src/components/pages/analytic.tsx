@@ -275,7 +275,7 @@ const Analytic: FunctionalComponent = () => {
             <div class="card-body">
               <h5 class="card-title">Сумма</h5>
               <p class="card-text display-4">
-                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(totalAmount / 100)}
+                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(totalAmount)}
               </p>
             </div>
           </div>
@@ -309,7 +309,7 @@ const Analytic: FunctionalComponent = () => {
                     >
                       <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
                         <span style={{color: '#e6e8eb'}}>{category.name}</span>
-                        <span style={{color: '#e6e8eb'}}>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount / 100)} ({percentage.toFixed(1)}%)</span>
+                        <span style={{color: '#e6e8eb'}}>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount)} ({percentage.toFixed(1)}%)</span>
                       </div>
                       <div style={{background: '#373a42', height: '20px', borderRadius: '4px', overflow: 'hidden'}}>
                         <div
@@ -337,7 +337,7 @@ const Analytic: FunctionalComponent = () => {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        {category.name}: {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount / 100)} ({percentage.toFixed(1)}%)
+                        {category.name}: {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount)} ({percentage.toFixed(1)}%)
                       </div>
                     </div>
                   );
@@ -375,7 +375,7 @@ const Analytic: FunctionalComponent = () => {
                     >
                       <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
                         <span style={{color: '#e6e8eb'}}>{category?.name} / {subcategory.name}</span>
-                        <span style={{color: '#e6e8eb'}}>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount / 100)} ({percentage.toFixed(1)}%)</span>
+                        <span style={{color: '#e6e8eb'}}>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount)} ({percentage.toFixed(1)}%)</span>
                       </div>
                       <div style={{background: '#373a42', height: '20px', borderRadius: '4px', overflow: 'hidden'}}>
                         <div
@@ -403,7 +403,7 @@ const Analytic: FunctionalComponent = () => {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        {category?.name} / {subcategory.name}: {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount / 100)} ({percentage.toFixed(1)}%)
+                        {category?.name} / {subcategory.name}: {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount)} ({percentage.toFixed(1)}%)
                       </div>
                     </div>
                   );
