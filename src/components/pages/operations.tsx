@@ -1,5 +1,5 @@
 import { FunctionalComponent } from 'preact';
-import { useEffect, useState, useMemo } from 'preact/hooks';
+import { useState, useMemo } from 'preact/hooks';
 import { invoke } from '@tauri-apps/api/core';
 import { useData } from '../../context/DataContext';
 
@@ -26,7 +26,6 @@ const Operations: FunctionalComponent = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>('month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(null);
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [newOperationSubcategory, setNewOperationSubcategory] = useState<number | null>(null);
@@ -444,7 +443,27 @@ function openUpdateModal(op: Operation) {
           <div style={{position:'fixed',zIndex:1050,top:0,left:0,width:'100vw',height:'100vh', display:'flex',justifyContent:'center',alignItems:'center'}}>
             <div class="bg-dark rounded px-4 py-3 shadow-lg" style={{minWidth:400, maxWidth:500}}>
               <h5 class="mb-3" style={{color:'#e6e8eb'}}>Новая операция</h5>
-              {/* Removed subcategory selection from modal */}
+              
+              <div class="mb-3">
+                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
+                <select
+                  class="form-select"
+                  style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
+                  value={newOperationSubcategory || ''}
+                  disabled={saving}
+                  onChange={(e: Event) => setNewOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
+                >
+                  <option value="">Выберите подкатегорию</option>
+                  {subcategories.map(sub => {
+                    const cat = categories.find(c => c.id === sub.category_id);
+                    return (
+                      <option key={sub.id} value={sub.id}>
+                        {cat ? `${cat.name} / ${sub.name}` : sub.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
 
 
               <div class="mb-3">

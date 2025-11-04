@@ -2,22 +2,6 @@ import { FunctionalComponent } from 'preact';
 import { useState, useMemo } from 'preact/hooks';
 import { useData } from '../../context/DataContext';
 
-interface Operation {
-  id: number;
-  subcategory_id: number;
-  date: string;
-  value: number;
-}
-interface Category {
-  id: number;
-  name: string;
-}
-interface Subcategory {
-  id: number;
-  category_id: number;
-  name: string;
-}
-
 type DateFilter = 'day' | 'week' | 'month' | 'year' | 'custom';
 
 const Analytic: FunctionalComponent = () => {
