@@ -1,6 +1,7 @@
 import { FunctionalComponent } from 'preact';
 import { useEffect, useState, useMemo } from 'preact/hooks';
 import { invoke } from '@tauri-apps/api/core';
+import { useData } from '../../context/DataContext';
 
 interface Operation {
   id: number;
@@ -21,9 +22,7 @@ interface Subcategory {
 type DateFilter = 'day' | 'week' | 'month' | 'year' | 'custom';
 
 const Operations: FunctionalComponent = () => {
-  const [allOperations, setAllOperations] = useState<Operation[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const { operations: allOperations, categories, subcategories, refreshOperations } = useData();
   const [dateFilter, setDateFilter] = useState<DateFilter>('month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -38,20 +37,6 @@ const Operations: FunctionalComponent = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [expandedSubcategories, setExpandedSubcategories] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    invoke<Category[]>('list_categories').then(setCategories);
-    invoke<Subcategory[]>('list_subcategories').then(setSubcategories);
-  }, []);
-
-  // Load all operations from backend
-  useEffect(() => {
-    invoke<Operation[]>('list_operations', {})
-      .then(setAllOperations)
-      .catch(err => {
-        console.error('Error loading operations:', err);
-        setAllOperations([]);
-      });
-  }, []);
 
   // Helper function to format date as YYYY-MM-DD in local time
   function formatDateLocal(date: Date): string {
@@ -200,12 +185,8 @@ const Operations: FunctionalComponent = () => {
         value: valueInKopecks,
       });
       setShowModal(false);
-      // Reload all operations
-      invoke<Operation[]>('list_operations', {})
-        .then(setAllOperations)
-        .catch(err => {
-          console.error('Error reloading operations:', err);
-        });
+      // Refresh operations instead of making a new request
+      await refreshOperations();
     } catch (e: any) {
       setError(e.toString());
     } finally {
@@ -299,7 +280,7 @@ const Operations: FunctionalComponent = () => {
               class="form-select"
               style={{background: '#18191A', color: '#e6e8eb', border: '1px solid #444'}}
               value={selectedSubcategory || ''}
-              onChange={(e) => setSelectedSubcategory(e.target.value ? Number(e.target.value) : null)}
+              onChange={(e: Event) => setSelectedSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
             >
               <option value="">Все</option>
               {subcategories.map(sub => {
@@ -412,7 +393,7 @@ const Operations: FunctionalComponent = () => {
                   style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
                   value={newOperationSubcategory || ''}
                   disabled={saving}
-                  onChange={(e) => setNewOperationSubcategory(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e: Event) => setNewOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
                 >
                   <option value="">Выберите подкатегорию</option>
                   {subcategories.map(sub => {

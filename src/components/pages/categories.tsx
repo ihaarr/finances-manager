@@ -1,6 +1,7 @@
 import { FunctionalComponent } from 'preact';
 import { useEffect, useState, useRef } from 'preact/hooks';
 import { invoke } from '@tauri-apps/api/core';
+import { useData } from '../../context/DataContext';
 
 interface Category {
   id: number;
@@ -25,8 +26,7 @@ const fileIcon = <span class="me-2" role="img" aria-label="file">
 </span>;
 
 const Categories: FunctionalComponent = () => {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const { categories, subcategories, refreshCategories, refreshSubcategories, refreshAll } = useData();
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   // Dialog state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -46,10 +46,9 @@ const Categories: FunctionalComponent = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   function refresh() {
-    invoke<Category[]>("list_categories").then(setCategories);
-    invoke<Subcategory[]>("list_subcategories").then(setSubcategories);
+    refreshCategories();
+    refreshSubcategories();
   }
-  useEffect(() => { refresh(); }, []);
   function subsForCat(catId: number) { return subcategories.filter(s => s.category_id === catId); }
   function onAddCategory() { setNewCategoryName(""); setError(""); setShowCategoryModal(true); }
   function onAddSubcategory(categoryId: number) { setSubcategoryCategoryId(categoryId); setNewSubcategoryName(""); setError(""); setShowSubcategoryModal(true); }
@@ -93,21 +92,21 @@ const Categories: FunctionalComponent = () => {
     if (!newCategoryName.trim()) return setError("Введите название категории");
     setSaving(true); setError("");
     try { await invoke("create_category", { name: newCategoryName.trim() });
-      setShowCategoryModal(false); refresh();
+      setShowCategoryModal(false); refreshAll();
     } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
   async function saveSubcategory() {
     if (!newSubcategoryName.trim()) return setError("Введите название подкатегории");
     setSaving(true); setError("");
     try { await invoke("create_subcategory", { categoryId: subcategoryCategoryId, name: newSubcategoryName.trim() });
-      setShowSubcategoryModal(false); refresh();
+      setShowSubcategoryModal(false); refreshAll();
     } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
   async function removeCategory(id: number) {
-    await invoke('remove_category', { id }); refresh();
+    await invoke('remove_category', { id }); refreshAll();
   }
   async function removeSubcategory(id: number) {
-    await invoke('remove_subcategory', { id }); refresh();
+    await invoke('remove_subcategory', { id }); refreshAll();
   }
   // -- Edit Modal --
   function startEdit(type: 'category'|'subcategory', id: number, name: string) {
@@ -119,7 +118,7 @@ const Categories: FunctionalComponent = () => {
     try {
       if (editContext?.type === 'category') await invoke('update_category', { id: editContext.id, name: editName.trim() });
       else if (editContext?.type === 'subcategory') await invoke('update_subcategory', { id: editContext.id, name: editName.trim() });
-      setEditContext(null); refresh();
+      setEditContext(null); refreshAll();
     } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
 
