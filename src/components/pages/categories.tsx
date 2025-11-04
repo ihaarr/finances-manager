@@ -26,14 +26,14 @@ const fileIcon = <span class="me-2" role="img" aria-label="file">
 </span>;
 
 const Categories: FunctionalComponent = () => {
-  const { categories, subcategories, refreshCategories, refreshSubcategories, refreshAll } = useData();
+  const { categories, subcategories, addCategory, updateCategory, removeCategory: removeCategoryFromState, addSubcategory, updateSubcategory, removeSubcategory: removeSubcategoryFromState } = useData();
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   // Dialog state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [subcategoryCategoryId, setSubcategoryCategoryId] = useState<number | null>(null);
   // Edit modal state
-  const [editContext, setEditContext] = useState<{ type: 'category'|'subcategory', id: number, name: string }|null>(null);
+  const [editContext, setEditContext] = useState<{ type: 'category'|'subcategory', id: number, name: string, category_id?: number }|null>(null);
   const [editName, setEditName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -45,10 +45,6 @@ const Categories: FunctionalComponent = () => {
   // For focus management
   const menuRef = useRef<HTMLDivElement>(null);
 
-  function refresh() {
-    refreshCategories();
-    refreshSubcategories();
-  }
   function subsForCat(catId: number) { return subcategories.filter(s => s.category_id === catId); }
   function onAddCategory() { setNewCategoryName(""); setError(""); setShowCategoryModal(true); }
   function onAddSubcategory(categoryId: number) { setSubcategoryCategoryId(categoryId); setNewSubcategoryName(""); setError(""); setShowSubcategoryModal(true); }
@@ -91,34 +87,72 @@ const Categories: FunctionalComponent = () => {
   async function saveCategory() {
     if (!newCategoryName.trim()) return setError("Введите название категории");
     setSaving(true); setError("");
-    try { await invoke("create_category", { name: newCategoryName.trim() });
-      setShowCategoryModal(false); refreshAll();
+    try {
+      const result = await invoke<Category>("create_category", { name: newCategoryName.trim() });
+      // Use only the ID from response, and the name from UI input
+      const newCategory: Category = {
+        id: result.id,
+        name: newCategoryName.trim()
+      };
+      addCategory(newCategory);
+      setShowCategoryModal(false);
     } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
   async function saveSubcategory() {
     if (!newSubcategoryName.trim()) return setError("Введите название подкатегории");
     setSaving(true); setError("");
-    try { await invoke("create_subcategory", { categoryId: subcategoryCategoryId, name: newSubcategoryName.trim() });
-      setShowSubcategoryModal(false); refreshAll();
+    try {
+      const result = await invoke<Subcategory>("create_subcategory", { categoryId: subcategoryCategoryId, name: newSubcategoryName.trim() });
+      // Use only the ID from response, and the data from UI input
+      const newSubcategory: Subcategory = {
+        id: result.id,
+        category_id: subcategoryCategoryId!,
+        name: newSubcategoryName.trim()
+      };
+      addSubcategory(newSubcategory);
+      setShowSubcategoryModal(false);
     } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
   async function removeCategory(id: number) {
-    await invoke('remove_category', { id }); refreshAll();
+    await invoke('remove_category', { id });
+    removeCategoryFromState(id);
   }
   async function removeSubcategory(id: number) {
-    await invoke('remove_subcategory', { id }); refreshAll();
+    await invoke('remove_subcategory', { id });
+    removeSubcategoryFromState(id);
   }
   // -- Edit Modal --
   function startEdit(type: 'category'|'subcategory', id: number, name: string) {
-    setEditName(name); setEditContext({ type, id, name }); closeContextMenu(); setError("");
+    if (type === 'subcategory') {
+      const subcategory = subcategories.find(s => s.id === id);
+      setEditName(name); setEditContext({ type, id, name, category_id: subcategory?.category_id }); closeContextMenu(); setError("");
+    } else {
+      setEditName(name); setEditContext({ type, id, name }); closeContextMenu(); setError("");
+    }
   }
   async function saveEdit() {
     if (!editName.trim()) return setError('Введите новое имя');
     setSaving(true); setError("");
     try {
-      if (editContext?.type === 'category') await invoke('update_category', { id: editContext.id, name: editName.trim() });
-      else if (editContext?.type === 'subcategory') await invoke('update_subcategory', { id: editContext.id, name: editName.trim() });
-      setEditContext(null); refreshAll();
+      if (editContext?.type === 'category') {
+        const result = await invoke<Category>('update_category', { id: editContext.id, name: editName.trim() });
+        // Use only the ID from response, and the name from UI input
+        const categoryToUpdate: Category = {
+          id: result.id,
+          name: editName.trim()
+        };
+        updateCategory(categoryToUpdate);
+      } else if (editContext?.type === 'subcategory') {
+        const result = await invoke<Subcategory>('update_subcategory', { id: editContext.id, name: editName.trim() });
+        // Use the category_id from editContext and the name from UI input
+        const subcategoryToUpdate: Subcategory = {
+          id: result.id,
+          category_id: editContext.category_id || 0,
+          name: editName.trim()
+        };
+        updateSubcategory(subcategoryToUpdate);
+      }
+      setEditContext(null);
     } catch (e: any) { setError(e.toString()); } finally { setSaving(false); }
   }
 

@@ -22,7 +22,7 @@ interface Subcategory {
 type DateFilter = 'day' | 'week' | 'month' | 'year' | 'custom';
 
 const Operations: FunctionalComponent = () => {
-  const { operations: allOperations, categories, subcategories, refreshOperations } = useData();
+  const { operations: allOperations, categories, subcategories, addOperation, updateOperation, removeOperation } = useData();
   const [dateFilter, setDateFilter] = useState<DateFilter>('month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -169,6 +169,15 @@ const Operations: FunctionalComponent = () => {
     setShowModal(true);
   }
 
+  async function removeOperationById(id: number) {
+    try {
+      await invoke('remove_operation', { id });
+      removeOperation(id);
+    } catch (e: any) {
+      console.error('Error removing operation:', e);
+    }
+  }
+
   async function saveOperation() {
     if (!newOperationSubcategory) return setError('Выберите подкатегорию');
     if (!newOperationDate) return setError('Укажите дату');
@@ -179,14 +188,20 @@ const Operations: FunctionalComponent = () => {
     try {
       // Convert value from rubles to kopecks (assuming input is in rubles)
       const valueInKopecks = Math.round(Number(newOperationValue) * 100);
-      await invoke('create_operation', {
+      const result = await invoke<Operation>('create_operation', {
         subcategoryId: newOperationSubcategory,
         date: newOperationDate,
         value: valueInKopecks,
       });
       setShowModal(false);
-      // Refresh operations instead of making a new request
-      await refreshOperations();
+      // Use only the ID from response, and the data from UI input
+      const newOperation: Operation = {
+        id: result.id,
+        subcategory_id: newOperationSubcategory,
+        date: newOperationDate,
+        value: valueInKopecks
+      };
+      addOperation(newOperation);
     } catch (e: any) {
       setError(e.toString());
     } finally {
@@ -358,8 +373,21 @@ const Operations: FunctionalComponent = () => {
                                 <div style={{color: '#999', fontSize: '0.9em'}}>
                                   {new Date(op.date).toLocaleDateString('ru-RU')}
                                 </div>
-                                <div style={{color: '#e6e8eb', fontSize: '1.1em', fontWeight: 'bold'}}>
-                                  {formatValue(op.value)}
+                                <div class="d-flex align-items-center">
+                                  <div style={{color: '#e6e8eb', fontSize: '1.1em', fontWeight: 'bold', marginRight: '10px'}}>
+                                    {formatValue(op.value)}
+                                  </div>
+                                  <button
+                                    class="btn btn-sm"
+                                    style={{color: '#e25e5e', padding: '0.25rem 0.5rem'}}
+                                    onClick={() => removeOperationById(op.id)}
+                                    title="Удалить операцию"
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 1 .5-.5zm3 .5a.5.5 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 1 1h6a1 1 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
+                                  </button>
                                 </div>
                               </div>
                             </div>

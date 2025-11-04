@@ -213,6 +213,15 @@ fn update_subcategory(state: State<AppState>, id: usize, name: String) -> Result
 }
 
 #[tauri::command]
+fn remove_operation(state: State<AppState>, id: usize) -> Result<(), String> {
+    println!("remove_operation called with id: {}", id);
+    let conn = state.conn.lock().unwrap();
+    conn.execute("DELETE FROM operation WHERE id=?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn list_operations(state: State<AppState>) -> Result<Value, String> {
     println!("list_operations called");
     let conn = state.conn.lock().unwrap();
@@ -243,7 +252,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(
             tauri::generate_handler![
-                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory, create_operation, list_operations
+                create_category, create_subcategory, list_categories, list_subcategories, remove_category, remove_subcategory, update_category, update_subcategory, create_operation, list_operations, remove_operation
             ]
         )
         .run(tauri::generate_context!())

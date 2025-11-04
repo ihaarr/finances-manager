@@ -35,6 +35,15 @@ interface DataContextType extends DataState {
   refreshSubcategories: () => Promise<void>;
   refreshOperations: () => Promise<void>;
   refreshAll: () => Promise<void>;
+  addCategory: (category: Category) => void;
+  updateCategory: (category: Category) => void;
+  removeCategory: (id: number) => void;
+  addSubcategory: (subcategory: Subcategory) => void;
+  updateSubcategory: (subcategory: Subcategory) => void;
+  removeSubcategory: (id: number) => void;
+  addOperation: (operation: Operation) => void;
+  updateOperation: (operation: Operation) => void;
+  removeOperation: (id: number) => void;
   setCategories: Dispatch<SetStateAction<Category[]>>;
   setSubcategories: Dispatch<SetStateAction<Subcategory[]>>;
   setOperations: Dispatch<SetStateAction<Operation[]>>;
@@ -47,11 +56,54 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 // Provider component
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [operations, setOperations] = useState<Operation[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+const [categories, setCategories] = useState<Category[]>([]);
+const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+const [operations, setOperations] = useState<Operation[]>([]);
+const [loading, setLoading] = useState<boolean>(true);
+const [error, setError] = useState<string | null>(null);
+
+// Category management functions
+const addCategory = (category: Category) => {
+  setCategories(prev => [...prev, category]);
+};
+
+const updateCategory = (updatedCategory: Category) => {
+  setCategories(prev => prev.map(cat => cat.id === updatedCategory.id ? updatedCategory : cat));
+};
+
+const removeCategory = (id: number) => {
+  setCategories(prev => prev.filter(cat => cat.id !== id));
+  // Also remove subcategories that belong to this category
+  setSubcategories(prev => prev.filter(sub => sub.category_id !== id));
+};
+
+// Subcategory management functions
+const addSubcategory = (subcategory: Subcategory) => {
+  setSubcategories(prev => [...prev, subcategory]);
+};
+
+const updateSubcategory = (updatedSubcategory: Subcategory) => {
+  setSubcategories(prev => prev.map(sub => sub.id === updatedSubcategory.id ? updatedSubcategory : sub));
+};
+
+const removeSubcategory = (id: number) => {
+  setSubcategories(prev => prev.filter(sub => sub.id !== id));
+  // Also remove operations that belong to this subcategory
+  setOperations(prev => prev.filter(op => op.subcategory_id !== id));
+};
+
+// Operation management functions
+const addOperation = (operation: Operation) => {
+  setOperations(prev => [...prev, operation]);
+};
+
+const updateOperation = (updatedOperation: Operation) => {
+  setOperations(prev => prev.map(op => op.id === updatedOperation.id ? updatedOperation : op));
+};
+
+const removeOperation = (id: number) => {
+  setOperations(prev => prev.filter(op => op.id !== id));
+};
 
   // Function to refresh categories
   const refreshCategories = async () => {
@@ -126,6 +178,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     refreshSubcategories,
     refreshOperations,
     refreshAll,
+    addCategory,
+    updateCategory,
+    removeCategory,
+    addSubcategory,
+    updateSubcategory,
+    removeSubcategory,
+    addOperation,
+    updateOperation,
+    removeOperation,
     setCategories,
     setSubcategories,
     setOperations,
