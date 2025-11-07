@@ -135,18 +135,18 @@ const Categories: FunctionalComponent = () => {
     setSaving(true); setError("");
     try {
       if (editContext?.type === 'category') {
-        const result = await invoke<Category>('update_category', { id: editContext.id, name: editName.trim() });
+        await invoke<Category>('update_category', { id: editContext.id, name: editName.trim() });
         // Use only the ID from response, and the name from UI input
         const categoryToUpdate: Category = {
-          id: result.id,
+          id: editContext.id,
           name: editName.trim()
         };
         updateCategory(categoryToUpdate);
       } else if (editContext?.type === 'subcategory') {
-        const result = await invoke<Subcategory>('update_subcategory', { id: editContext.id, name: editName.trim() });
+        await invoke<Subcategory>('update_subcategory', { id: editContext.id, name: editName.trim() });
         // Use the category_id from editContext and the name from UI input
         const subcategoryToUpdate: Subcategory = {
-          id: result.id,
+          id: editContext.id,
           category_id: editContext.category_id || 0,
           name: editName.trim()
         };
