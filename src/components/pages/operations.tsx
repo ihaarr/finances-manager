@@ -29,6 +29,7 @@ const Operations: FunctionalComponent = () => {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [newOperationSubcategory, setNewOperationSubcategory] = useState<number | null>(null);
+  const [newOperationCategory, setNewOperationCategory] = useState<number | null>(null);
   const [newOperationDate, setNewOperationDate] = useState(new Date().toISOString().split('T')[0]);
   const [newOperationValue, setNewOperationValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -42,6 +43,7 @@ const Operations: FunctionalComponent = () => {
   const [updateOperationSubcategory, setUpdateOperationSubcategory] = useState<number | null>(null);
   const [updateOperationDate, setUpdateOperationDate] = useState('');
   const [updateOperationValue, setUpdateOperationValue] = useState('');
+  const [updateOperationCategory, setUpdateOperationCategory] = useState<number | null>(null);
 
 
   // Helper function to format date as YYYY-MM-DD in local time
@@ -169,6 +171,7 @@ const Operations: FunctionalComponent = () => {
   }
 
   function onAddOperation() {
+    setNewOperationCategory(null);
     setNewOperationSubcategory(null);
     setNewOperationDate(new Date().toISOString().split('T')[0]);
     setNewOperationValue('');
@@ -247,7 +250,10 @@ function openUpdateModal(op: Operation) {
   const subcategory = subcategories.find(s => s.id === op.subcategory_id);
   if (!subcategory) return;
   
+  const category = categories.find(c => c.id === subcategory!.category_id);
+  
   setUpdateOperationId(op.id);
+  setUpdateOperationCategory(category?.id || null);
   setUpdateOperationSubcategory(op.subcategory_id);
   setUpdateOperationDate(op.date);
   setUpdateOperationValue(op.value.toString());
@@ -454,24 +460,47 @@ function openUpdateModal(op: Operation) {
               <h5 class="mb-3" style={{color:'#e6e8eb'}}>Новая операция</h5>
               
               <div class="mb-3">
-                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
+                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Категория</label>
                 <select
-                  class="form-select"
+                  class="form-select mb-2"
                   style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
-                  value={newOperationSubcategory || ''}
+                  value={newOperationCategory || ''}
                   disabled={saving}
-                  onChange={(e: Event) => setNewOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
+                  onChange={(e: Event) => {
+                    const categoryId = e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null;
+                    setNewOperationCategory(categoryId);
+                    setNewOperationSubcategory(null); // Reset subcategory when category changes
+                  }}
                 >
-                  <option value="">Выберите подкатегорию</option>
-                  {subcategories.map(sub => {
-                    const cat = categories.find(c => c.id === sub.category_id);
-                    return (
-                      <option key={sub.id} value={sub.id}>
-                        {cat ? `${cat.name} / ${sub.name}` : sub.name}
-                      </option>
-                    );
-                  })}
+                  <option value="">Выберите категорию</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
+                
+                {newOperationCategory !== null && (
+                  <div>
+                    <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
+                    <select
+                      class="form-select"
+                      style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
+                      value={newOperationSubcategory || ''}
+                      disabled={saving}
+                      onChange={(e: Event) => setNewOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
+                    >
+                      <option value="">Выберите подкатегорию</option>
+                      {subcategories
+                        .filter(sub => sub.category_id === newOperationCategory)
+                        .map(sub => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
 
@@ -528,24 +557,47 @@ function openUpdateModal(op: Operation) {
               <h5 class="mb-3" style={{color:'#e6e8eb'}}>Редактировать операцию</h5>
               
               <div class="mb-3">
-                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
+                <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Категория</label>
                 <select
-                  class="form-select"
+                  class="form-select mb-2"
                   style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
-                  value={updateOperationSubcategory || ''}
+                  value={updateOperationCategory || ''}
                   disabled={saving}
-                  onChange={(e: Event) => setUpdateOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
+                  onChange={(e: Event) => {
+                    const categoryId = e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null;
+                    setUpdateOperationCategory(categoryId);
+                    setUpdateOperationSubcategory(null); // Reset subcategory when category changes
+                  }}
                 >
-                  <option value="">Выберите подкатегорию</option>
-                  {subcategories.map(sub => {
-                    const cat = categories.find(c => c.id === sub.category_id);
-                    return (
-                      <option key={sub.id} value={sub.id}>
-                        {cat ? `${cat.name} / ${sub.name}` : sub.name}
-                      </option>
-                    );
-                  })}
+                  <option value="">Выберите категорию</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
                 </select>
+                
+                {updateOperationCategory !== null && (
+                  <div>
+                    <label class="form-label" style={{color:'#e6e8eb', marginBottom: '8px'}}>Подкатегория</label>
+                    <select
+                      class="form-select"
+                      style={{background:'#23242c', color:'#e6e8eb', border:'1px solid #444'}}
+                      value={updateOperationSubcategory || ''}
+                      disabled={saving}
+                      onChange={(e: Event) => setUpdateOperationSubcategory(e.target && (e.target as HTMLInputElement).value ? Number((e.target as HTMLInputElement).value) : null)}
+                    >
+                      <option value="">Выберите подкатегорию</option>
+                      {subcategories
+                        .filter(sub => sub.category_id === updateOperationCategory)
+                        .map(sub => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div class="mb-3">
