@@ -133,8 +133,8 @@ const Operations: FunctionalComponent = () => {
     setExpandedSubcategories(newExpanded);
   }
 
-  function groupOperationsByCategory(): Array<{category: Category, subcategories: Array<{subcategory: Subcategory, operations: Operation[]}>}> {
-    const grouped: Map<number, {category: Category, subcategories: Map<number, {subcategory: Subcategory, operations: Operation[]}>}> = new Map();
+  function groupOperationsByCategory(): Array<{category: Category, subcategories: Array<{subcategory: Subcategory, operations: Operation[], sum: number}>}> {
+    const grouped: Map<number, {category: Category, subcategories: Map<number, {subcategory: Subcategory, operations: Operation[], sum: number}>}> = new Map();
 
     operations.forEach(op => {
       const sub = subcategories.find(s => s.id === op.subcategory_id);
@@ -149,16 +149,22 @@ const Operations: FunctionalComponent = () => {
 
       const catGroup = grouped.get(cat.id)!;
       if (!catGroup.subcategories.has(sub.id)) {
-        catGroup.subcategories.set(sub.id, { subcategory: sub, operations: [] });
+        catGroup.subcategories.set(sub.id, { subcategory: sub, operations: [], sum: 0 });
       }
 
-      catGroup.subcategories.get(sub.id)!.operations.push(op);
+      const subGroup = catGroup.subcategories.get(sub.id)!;
+      subGroup.operations.push(op);
+      subGroup.sum += op.value; // Add operation value to subcategory sum
     });
 
-    // Convert to array and sort subcategories within each category
+    // Convert to array, calculate category sums, and sort subcategories within each category
     return Array.from(grouped.values()).map(group => ({
       category: group.category,
-      subcategories: Array.from(group.subcategories.values()).sort((a, b) => a.subcategory.name.localeCompare(b.subcategory.name))
+      subcategories: Array.from(group.subcategories.values()).map(sub => ({
+        subcategory: sub.subcategory,
+        operations: sub.operations,
+        sum: sub.sum
+      })).sort((a, b) => a.subcategory.name.localeCompare(b.subcategory.name))
     })).sort((a, b) => a.category.name.localeCompare(b.category.name));
   }
 
@@ -345,6 +351,9 @@ function openUpdateModal(op: Operation) {
             </svg>;
             const expandIcon = isExpanded ? '▼' : '▶';
             
+            // Calculate total sum for the category
+            const categorySum = subcategories.reduce((sum, sub) => sum + sub.sum, 0);
+            
             return (
               <div key={category.id} style={{background: '#23242c', borderRadius: '8px', marginBottom: 12, overflow: 'hidden', boxShadow: '0 1px 4px #15151b80'}}>
                 {/* Category Header */}
@@ -357,14 +366,14 @@ function openUpdateModal(op: Operation) {
                   {folderIcon}
                   <span class="fw-semibold">{category.name}</span>
                   <span class="ms-auto" style={{color: '#999', fontSize: '0.9em'}}>
-                    {subcategories.reduce((sum, sub) => sum + sub.operations.length, 0)} операций
+                    {subcategories.reduce((sum, sub) => sum + sub.operations.length, 0)} операций, {formatValue(categorySum)}
                   </span>
                 </div>
 
                 {/* Subcategories and Operations */}
                 {isExpanded && (
                   <div style={{borderTop: '1px solid #333'}}>
-                    {subcategories.map(({ subcategory, operations: subOps }, subIdx) => {
+                    {subcategories.map(({ subcategory, operations: subOps, sum }, subIdx) => {
                       const isSubExpanded = expandedSubcategories.has(subcategory.id);
                       const subExpandIcon = isSubExpanded ? '▼' : '▶';
                       const fileIcon = <svg width="14" height="14" viewBox="0 0 18 20" fill="currentColor" style={{color: '#999', marginRight: '6px'}}>
@@ -383,7 +392,7 @@ function openUpdateModal(op: Operation) {
                             {fileIcon}
                             <span>{subcategory.name}</span>
                             <span class="ms-auto" style={{color: '#999', fontSize: '0.85em'}}>
-                              {subOps.length} операций
+                              {subOps.length} операций, {formatValue(sum)}
                             </span>
                           </div>
                           {/* Operations in Subcategory */}
